@@ -1,3 +1,9 @@
+---
+name: Rust
+extensions: [.rs]
+config: [Cargo.toml]
+---
+
 ### Rust Best Practices
 
 #### Code Style

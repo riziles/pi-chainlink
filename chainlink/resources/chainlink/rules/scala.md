@@ -1,3 +1,9 @@
+---
+name: Scala
+extensions: [.scala]
+config: []
+---
+
 ### Scala Best Practices
 
 #### Code Style

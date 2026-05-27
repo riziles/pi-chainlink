@@ -1,3 +1,9 @@
+---
+name: TypeScript
+extensions: [.ts]
+config: [tsconfig.json]
+---
+
 ### TypeScript Best Practices
 
 #### Warnings Are Errors - ABSOLUTE RULE

@@ -1,3 +1,9 @@
+---
+name: Kotlin
+extensions: [.kt, .kts]
+config: []
+---
+
 ### Kotlin Best Practices
 
 #### Code Style

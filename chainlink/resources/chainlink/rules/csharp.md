@@ -1,3 +1,9 @@
+---
+name: C#
+extensions: [.cs]
+config: []
+---
+
 ### C# Best Practices
 
 #### Code Style

@@ -1,3 +1,9 @@
+---
+name: Go
+extensions: [.go]
+config: [go.mod]
+---
+
 ### Go Best Practices
 
 #### Code Style

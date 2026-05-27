@@ -1,3 +1,9 @@
+---
+name: Python
+extensions: [.py]
+config: [pyproject.toml, requirements.txt]
+---
+
 ### Python Best Practices
 
 #### Code Style

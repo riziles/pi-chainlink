@@ -1,3 +1,9 @@
+---
+name: TypeScript/React
+extensions: [.tsx]
+config: []
+---
+
 ### TypeScript/React Best Practices
 
 #### Component Structure

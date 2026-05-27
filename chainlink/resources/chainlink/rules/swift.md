@@ -1,3 +1,9 @@
+---
+name: Swift
+extensions: [.swift]
+config: [Package.swift]
+---
+
 ### Swift Best Practices
 
 #### Code Style

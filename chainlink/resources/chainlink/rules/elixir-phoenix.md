@@ -1,3 +1,9 @@
+---
+name: Elixir/Phoenix
+extensions: [.heex]
+config: []
+---
+
 # Phoenix & LiveView Rules
 
 ## HEEx Template Syntax (Critical)

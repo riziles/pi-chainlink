@@ -1,3 +1,9 @@
+---
+name: Elixir
+extensions: [.ex, .exs]
+config: [mix.exs]
+---
+
 # Elixir Core Rules
 
 ## Critical Mistakes to Avoid

@@ -1,3 +1,9 @@
+---
+name: C++
+extensions: [.cpp, .cc, .cxx]
+config: []
+---
+
 ### C++ Best Practices
 
 #### Modern C++ (C++17+)

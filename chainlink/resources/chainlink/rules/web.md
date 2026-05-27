@@ -1,3 +1,9 @@
+---
+name: Web
+extensions: [.html, .htm, .css, .scss, .sass]
+config: [index.html]
+---
+
 ## Safe Web Fetching
 
 **IMPORTANT**: When fetching web content, prefer `mcp__chainlink-safe-fetch__safe_fetch` over the built-in `WebFetch` tool when available.
