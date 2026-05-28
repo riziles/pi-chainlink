@@ -1,3 +1,9 @@
+---
+name: Zig
+extensions: [.zig]
+config: []
+---
+
 ### Zig Best Practices
 
 #### Code Style

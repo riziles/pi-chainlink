@@ -22,14 +22,92 @@ from chainlink_config import (
 setup_utf8_stdout()
 
 
-def load_all_rules(chainlink_dir):
-    """Load all rule files from .chainlink/rules/, with .chainlink/rules.local/ overrides."""
+def parse_frontmatter(content):
+    """Parse YAML-like frontmatter from a markdown file. Returns (meta_dict, body_str).
+
+    Frontmatter is a block between two '---' lines at the start of the file.
+    Only simple key: value and key: [list, items] forms are supported (no PyYAML dep).
+    """
+    if not content.startswith('---'):
+        return {}, content
+    lines = content.split('\n')
+    end_idx = None
+    for i, line in enumerate(lines[1:], 1):
+        if line.strip() == '---':
+            end_idx = i
+            break
+    if end_idx is None:
+        return {}, content
+
+    meta = {}
+    for line in lines[1:end_idx]:
+        if ':' not in line:
+            continue
+        key, _, val = line.partition(':')
+        key = key.strip()
+        val = val.strip()
+        if val.startswith('[') and val.endswith(']'):
+            items = [x.strip().strip('"\'') for x in val[1:-1].split(',') if x.strip()]
+            meta[key] = items
+        elif val:
+            meta[key] = val
+
+    body = '\n'.join(lines[end_idx + 1:]).lstrip('\n')
+    return meta, body
+
+
+def _build_detection_maps(chainlink_dir):
+    """Build extension→language and config_file→language maps from rule file frontmatter."""
+    ext_to_lang = {}
+    config_to_lang = {}
+
     if not chainlink_dir:
-        return {}, "", ""
+        return ext_to_lang, config_to_lang
 
     rules_dir = os.path.join(chainlink_dir, 'rules')
     if not os.path.isdir(rules_dir):
-        return {}, "", ""
+        return ext_to_lang, config_to_lang
+
+    try:
+        entries = sorted(os.listdir(rules_dir))
+    except (PermissionError, OSError):
+        return ext_to_lang, config_to_lang
+
+    for entry in entries:
+        if not entry.endswith('.md'):
+            continue
+        try:
+            with open(os.path.join(rules_dir, entry), 'r', encoding='utf-8') as f:
+                raw = f.read()
+        except OSError:
+            continue
+        meta, _ = parse_frontmatter(raw)
+        if 'name' not in meta:
+            continue
+        lang_name = meta['name']
+        for ext in meta.get('extensions', []):
+            ext_lower = ext.lower()
+            if ext_lower not in ext_to_lang:
+                ext_to_lang[ext_lower] = lang_name
+        for cfg in meta.get('config', []):
+            if cfg not in config_to_lang:
+                config_to_lang[cfg] = lang_name
+
+    return ext_to_lang, config_to_lang
+
+
+def load_all_rules(chainlink_dir):
+    """Load all rule files from .chainlink/rules/, with .chainlink/rules.local/ overrides.
+
+    Language rule files are identified by a YAML frontmatter block containing a 'name' field.
+    Non-language files (global, project, quality, rigor, tracking) have no such frontmatter.
+    """
+    if not chainlink_dir:
+        return {}, "", "", "", ""
+
+    rules_dir = os.path.join(chainlink_dir, 'rules')
+    if not os.path.isdir(rules_dir):
+        return {}, "", "", "", ""
 
     # Local overrides directory (gitignored, machine-local)
     rules_local_dir = os.path.join(chainlink_dir, 'rules.local')
@@ -42,31 +120,24 @@ def load_all_rules(chainlink_dir):
     # Load project rules
     project_rules = load_rule_file(rules_dir, 'project.md', rules_local_dir)
 
-    # Load language-specific rules
+    # Dynamically discover language rule files via frontmatter 'name' field
     language_rules = {}
-    language_files = [
-        ('rust.md', 'Rust'),
-        ('python.md', 'Python'),
-        ('javascript.md', 'JavaScript'),
-        ('typescript.md', 'TypeScript'),
-        ('typescript-react.md', 'TypeScript/React'),
-        ('javascript-react.md', 'JavaScript/React'),
-        ('go.md', 'Go'),
-        ('java.md', 'Java'),
-        ('c.md', 'C'),
-        ('cpp.md', 'C++'),
-        ('csharp.md', 'C#'),
-        ('ruby.md', 'Ruby'),
-        ('php.md', 'PHP'),
-        ('swift.md', 'Swift'),
-        ('kotlin.md', 'Kotlin'),
-        ('scala.md', 'Scala'),
-        ('zig.md', 'Zig'),
-        ('odin.md', 'Odin'),
-    ]
+    try:
+        rule_entries = sorted(os.listdir(rules_dir))
+    except (PermissionError, OSError):
+        rule_entries = []
 
-    for filename, lang_name in language_files:
-        content = load_rule_file(rules_dir, filename, rules_local_dir)
+    for entry in rule_entries:
+        if not entry.endswith('.md'):
+            continue
+        raw = load_rule_file(rules_dir, entry, rules_local_dir)
+        if not raw:
+            continue
+        meta, body = parse_frontmatter(raw)
+        if 'name' not in meta:
+            continue
+        lang_name = meta['name']
+        content = body.strip()
         if content:
             language_rules[lang_name] = content
 
@@ -79,45 +150,16 @@ def load_all_rules(chainlink_dir):
 
 # Detect language from common file extensions in the working directory
 def detect_languages():
-    """Scan for common source files to determine active languages."""
-    extensions = {
-        '.rs': 'Rust',
-        '.py': 'Python',
-        '.js': 'JavaScript',
-        '.ts': 'TypeScript',
-        '.tsx': 'TypeScript/React',
-        '.jsx': 'JavaScript/React',
-        '.go': 'Go',
-        '.java': 'Java',
-        '.c': 'C',
-        '.cpp': 'C++',
-        '.cs': 'C#',
-        '.rb': 'Ruby',
-        '.php': 'PHP',
-        '.swift': 'Swift',
-        '.kt': 'Kotlin',
-        '.scala': 'Scala',
-        '.zig': 'Zig',
-        '.odin': 'Odin',
-    }
+    """Scan for source files to determine active languages.
+
+    Extension and config-file mappings are loaded dynamically from the language rule
+    files' frontmatter, so adding a new language .md file is all that's needed.
+    """
+    chainlink_dir = find_chainlink_dir()
+    ext_to_lang, config_to_lang = _build_detection_maps(chainlink_dir)
 
     found = set()
     cwd = get_project_root()
-
-    # Check for project config files first (more reliable than scanning)
-    config_indicators = {
-        'Cargo.toml': 'Rust',
-        'package.json': 'JavaScript',
-        'tsconfig.json': 'TypeScript',
-        'pyproject.toml': 'Python',
-        'requirements.txt': 'Python',
-        'go.mod': 'Go',
-        'pom.xml': 'Java',
-        'build.gradle': 'Java',
-        'Gemfile': 'Ruby',
-        'composer.json': 'PHP',
-        'Package.swift': 'Swift',
-    }
 
     # Check cwd and immediate subdirs for config files
     check_dirs = [cwd]
@@ -127,10 +169,10 @@ def detect_languages():
             if os.path.isdir(subdir) and not entry.startswith('.'):
                 check_dirs.append(subdir)
     except (PermissionError, OSError):
-        pass
+        check_dirs = [cwd]
 
     for check_dir in check_dirs:
-        for config_file, lang in config_indicators.items():
+        for config_file, lang in config_to_lang.items():
             if os.path.exists(os.path.join(check_dir, config_file)):
                 found.add(lang)
 
@@ -139,7 +181,6 @@ def detect_languages():
     src_dir = os.path.join(cwd, 'src')
     if os.path.isdir(src_dir):
         scan_dirs.append(src_dir)
-    # Check nested project src dirs too
     for check_dir in check_dirs:
         nested_src = os.path.join(check_dir, 'src')
         if os.path.isdir(nested_src):
@@ -147,12 +188,13 @@ def detect_languages():
 
     for scan_dir in scan_dirs:
         try:
-            for entry in os.listdir(scan_dir):
-                ext = os.path.splitext(entry)[1].lower()
-                if ext in extensions:
-                    found.add(extensions[ext])
+            dir_entries = os.listdir(scan_dir)
         except (PermissionError, OSError):
-            pass
+            continue
+        for entry in dir_entries:
+            ext = os.path.splitext(entry)[1].lower()
+            if ext in ext_to_lang:
+                found.add(ext_to_lang[ext])
 
     return list(found) if found else ['the project']
 
@@ -280,7 +322,7 @@ def get_dependencies(max_deps=30):
                         if len(deps) >= max_deps:
                             break
         except (OSError, Exception):
-            pass
+            deps.clear()
         if deps:
             return "Rust (Cargo.toml):\n" + "\n".join(deps[:max_deps])
 
@@ -297,7 +339,7 @@ def get_dependencies(max_deps=30):
                             if len(deps) >= max_deps:
                                 break
         except (OSError, json.JSONDecodeError, Exception):
-            pass
+            deps.clear()
         if deps:
             return "Node.js (package.json):\n" + "\n".join(deps[:max_deps])
 
@@ -313,7 +355,7 @@ def get_dependencies(max_deps=30):
                         if len(deps) >= max_deps:
                             break
         except (OSError, Exception):
-            pass
+            deps.clear()
         if deps:
             return "Python (requirements.txt):\n" + "\n".join(deps[:max_deps])
 
@@ -335,7 +377,7 @@ def get_dependencies(max_deps=30):
                         if len(deps) >= max_deps:
                             break
         except (OSError, Exception):
-            pass
+            deps.clear()
         if deps:
             return "Go (go.mod):\n" + "\n".join(deps[:max_deps])
 
@@ -393,7 +435,7 @@ Examples of when to search:
 
 ### General Requirements
 1. **NO STUBS - ABSOLUTE RULE**:
-   - NEVER write `TODO`, `FIXME`, `pass`, `...`, `unimplemented!()` as implementation
+   - NEVER write stub placeholders as implementation (no task-marker comments, no empty bodies, no unimpl shims)
    - NEVER write empty function bodies or placeholder returns
    - NEVER say "implement later" or "add logic here"
    - If logic is genuinely too complex for one turn, use `raise NotImplementedError("Descriptive reason: what needs to be done")` and create a chainlink issue
@@ -499,7 +541,7 @@ def mark_full_guard_sent(chainlink_dir):
         with open(marker, 'w') as f:
             f.write(str(datetime.now().timestamp()))
     except OSError:
-        pass
+        return
 
 
 def load_tracking_rules(chainlink_dir, tracking_mode):

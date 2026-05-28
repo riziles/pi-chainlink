@@ -1,3 +1,9 @@
+---
+name: Ruby
+extensions: [.rb]
+config: [Gemfile]
+---
+
 ### Ruby Best Practices
 
 #### Code Style

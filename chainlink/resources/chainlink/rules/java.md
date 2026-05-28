@@ -1,3 +1,9 @@
+---
+name: Java
+extensions: [.java]
+config: [pom.xml, build.gradle]
+---
+
 ### Java Best Practices
 
 #### Code Style

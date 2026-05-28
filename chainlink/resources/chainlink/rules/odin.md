@@ -1,3 +1,9 @@
+---
+name: Odin
+extensions: [.odin]
+config: []
+---
+
 ### Odin Best Practices
 
 #### Code Style

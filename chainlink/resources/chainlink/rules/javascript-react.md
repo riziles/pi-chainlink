@@ -1,3 +1,9 @@
+---
+name: JavaScript/React
+extensions: [.jsx]
+config: []
+---
+
 ### JavaScript/React Best Practices
 
 #### Component Structure

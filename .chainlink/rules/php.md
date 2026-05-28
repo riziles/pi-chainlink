@@ -1,3 +1,9 @@
+---
+name: PHP
+extensions: [.php]
+config: [composer.json]
+---
+
 ### PHP Best Practices
 
 #### Code Style

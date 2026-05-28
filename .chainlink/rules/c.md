@@ -1,3 +1,9 @@
+---
+name: C
+extensions: [.c]
+config: []
+---
+
 ### C Best Practices
 
 #### Memory Safety

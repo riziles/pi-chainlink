@@ -78,6 +78,7 @@ context-compression resilience.
 - Fix daemon log file corruption from duplicate file handles (#97)
 
 ### Changed
+- Resolve issue #26 where the prompt_guard.py depends on local variables, replace with dynamic approach the detects enabled languages from the available language markdown files in chainlink (#1)
 - Block git mutation commands via hook (#113)
 - Fix wrong assertion directions and tautological property tests (#96)
 - Fix overly loose CLI integration test assertions (#95)

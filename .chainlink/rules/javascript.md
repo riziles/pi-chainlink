@@ -1,3 +1,9 @@
+---
+name: JavaScript
+extensions: [.js, .mjs]
+config: [package.json]
+---
+
 ### JavaScript Best Practices
 
 #### Code Style

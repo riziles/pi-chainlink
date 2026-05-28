@@ -76,7 +76,7 @@ pub fn run(db: &Database, chainlink_dir: &Path) -> Result<()> {
     }
 
     // Sort by score descending
-    scored.sort_by(|a, b| b.1.cmp(&a.1));
+    scored.sort_by_key(|b| std::cmp::Reverse(b.1));
 
     if scored.is_empty() {
         // All ready issues are subissues, show them instead
