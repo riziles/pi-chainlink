@@ -13,33 +13,22 @@ jobs:
   # Build Windows
   # ===========================================
   build-windows:
-    name: Build Windows (${{ matrix.target }})
+    name: Build Windows
     runs-on: windows-latest
     defaults:
       run:
         working-directory: chainlink
-    strategy:
-      fail-fast: false
-      matrix:
-        target:
-          - x86_64-pc-windows-msvc
-          - aarch64-pc-windows-msvc
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.target }}
-
       - name: Build release
-        run: cargo build --release --target ${{ matrix.target }}
+        run: cargo build --release
 
       - name: Upload artifact (unsigned)
         uses: actions/upload-artifact@v4
         with:
-          name: chainlink-${{ matrix.target }}
-          path: chainlink/target/${{ matrix.target }}/release/chainlink.exe
+          name: chainlink-x86_64-pc-windows-msvc
+          path: chainlink/target/release/chainlink.exe
 
   # ===========================================
   # Publish GitHub Release
@@ -58,7 +47,6 @@ jobs:
       - name: Rename artifacts to friendly names
         run: |
           mv artifacts/chainlink-x86_64-pc-windows-msvc.exe  artifacts/chainlink-windows-x86_64.exe
-          mv artifacts/chainlink-aarch64-pc-windows-msvc.exe artifacts/chainlink-windows-arm64.exe
 
       - name: Generate SHA256 checksums
         run: |
@@ -70,7 +58,6 @@ jobs:
         with:
           files: |
             artifacts/chainlink-windows-x86_64.exe
-            artifacts/chainlink-windows-arm64.exe
             artifacts/checksums.txt
           generate_release_notes: true
           draft: false
