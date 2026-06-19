@@ -239,16 +239,17 @@ pi.on("before_agent_start", async (event, ctx) => {
   }
 
   return {
-    injectMessages: [{
-      role: "user",
-      content: storedContext
-    }]
+    message: {
+      customType: "chainlink-context",
+      content: storedContext,
+      display: true,
+    },
   };
 });
 ```
 
 **Compaction handling:** Context is re-generated when older than 5 minutes (via `CONTEXT_STALENESS_MS`).
-Additionally, listen for `compaction_end` event to force immediate re-generation.
+Additionally, listen for `session_compact` event to force immediate re-generation.
 This covers the case where pi compacts context and earlier injected messages are lost.
 After compaction, the model sees fresh session state on the very next turn without waiting for the timer.
 
@@ -774,6 +775,66 @@ pi.registerTool({
 
 **When to implement:** Phase 9 — after the core extension is stable. The CLI-based approach works well
 for initial development and keeps the Phase 1-8 scope manageable.
+
+---
+
+## pi API Verified Types
+
+**Verified against pi v0.79.1 TypeScript types.** These are the exact field names and event signatures.
+
+### Tool input field names
+
+| Tool | File path field | Other fields |
+|------|----------------|-------------|
+| `write` | `event.input.path` | `event.input.content` |
+| `edit` | `event.input.path` | `event.input.edits[].oldText`, `.newText` |
+| `read` | `event.input.path` | `event.input.offset?`, `event.input.limit?` |
+| `bash` | (n/a) | `event.input.command`, `event.input.timeout?` |
+
+**Key finding:** `write` uses `path`, not `file_path`. The plan's `file_path || path` fallback
+handles this, but the primary field for `write` is `path`.
+
+### Context injection API
+
+`before_agent_start` returns `{ message }`, **not** `{ injectMessages }`. The message is a
+custom message stored in the session:
+
+```typescript
+return {
+  message: {
+    customType: "chainlink-context",
+    content: storedContext,  // string shown to the model
+    display: true,           // show in TUI
+  },
+};
+```
+
+### Compaction event
+
+The compaction event is `session_compact` (not `compaction_end`):
+
+```typescript
+pi.on("session_compact", async (event, ctx) => {
+  // event.compactionEntry - the saved compaction
+  // event.fromExtension - whether extension provided it
+  // Re-generate context here
+});
+```
+
+### isToolCallEventType type guard
+
+pi provides `isToolCallEventType` for typed tool call event handling:
+
+```typescript
+import { isToolCallEventType } from "@earendil-works/pi-coding-agent";
+
+pi.on("tool_call", async (event, ctx) => {
+  if (isToolCallEventType("write", event)) {
+    // event.input is typed as { path: string; content: string }
+    console.log(event.input.path);
+  }
+});
+```
 
 ---
 
