@@ -187,10 +187,14 @@ jobs:
   build-release:
     name: Build Release (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    env:
+      CARGO_BUILD_JOBS: 2
     defaults:
       run:
         working-directory: chainlink
     strategy:
+      fail-fast: false
       matrix:
         include:
           - os: ubuntu-latest
