@@ -187,32 +187,22 @@ function loadConfig(chainlinkDir: string): ChainlinkConfig;
 
 **Goal:** Inject Chainlink session state, issues, rules, and project structure into pi's context on session start and after compaction.
 
-### 2.1 Context Provider Integration (`src/context.ts`)
+### 2.1 Context Builder (`src/context.ts`)
 
-Two strategies, used together:
-
-**Strategy 1 — context-provider.py (the agent-agnostic bridge):**
-
-```typescript
-function getContextFromProvider(chainlinkDir: string, format: "xml" | "md" = "xml"): string | null;
-```
-
-- Runs `python .chainlink/integrations/context-provider.py --format xml`
-- Returns the full output (session + issues + rules + structure + workflow reminder)
-- Returns null if Python not available or script missing
-- Cached for 30 seconds to avoid re-running on rapid session events
-
-**Strategy 2 — direct rule loading (fallback/enhancement):**
+**Note:** chainlink v0.2.0 does not include `integrations/context-provider.py`.
+Context is built from direct rule loading and CLI output only.
 
 ```typescript
-function getRuleContent(chainlinkDir: string): string;
+function getRuleContent(chainlinkDir: string, trackingMode: string): string;
+function buildContext(chainlinkDir: string, client: ChainlinkClient): Promise<string>;
 ```
 
 - Reads `.chainlink/rules/global.md` (always)
 - Detects project languages and reads matching rule files (e.g., `python.md`, `typescript.md`)
 - Reads the mode-specific tracking rule (`tracking-strict.md`, etc.)
-- Wraps in `<coding-rules>` XML block
-- Used when `context-provider.py` isn't available, or to supplement it with additional rules the provider doesn't include
+- Calls `client.sessionStatus()` and `client.ready()` for session state and issue lists
+- Wraps in `<chainlink-session-context>` XML block
+- Cached for 30 seconds to avoid re-running on rapid session events
 
 ### 2.2 Injection Points
 
@@ -319,7 +309,41 @@ async function handleSessionLifecycle(client: ChainlinkClient): Promise<void>;
 on the same issue. Lock is acquired automatically on `sessionWork()` — the extension wraps
 the call with `client.locksAcquire(issueId)`.
 
-### 2.4 Configuration Validation
+### 2.5 chainlink init — What Gets Created
+
+Verified against chainlink v0.2.0. `chainlink init` creates:
+
+```
+.chainlink/
+├── .gitignore
+├── hook-config.json          # tracking_mode, blocked_git_commands, allowed_bash_prefixes
+├── issues.db                 # SQLite database
+├── rules/                    # Language-specific and mode-specific rule files (*.md, *.txt)
+└── rules.local/              # Gitignored per-machine overrides
+.claude/
+├── hooks/                    # Python hook scripts for Claude Code (work-check.py, etc.)
+│   ├── chainlink_config.py
+│   ├── post-edit-check.py
+│   ├── pre-web-check.py
+│   ├── prompt-guard.py
+│   ├── session-start.py
+│   └── work-check.py
+├── mcp/
+│   └── safe-fetch-server.py
+└── settings.json             # Claude Code hook configuration
+```
+
+**Key findings:**
+- No `integrations/` directory — no `context-provider.py`. The plan's Strategy 1 (Python bridge) is not
+  available in the current chainlink release. Context must be built from direct rule loading and CLI output.
+- `hook-config.json` defaults to `tracking_mode: "strict"` with blocked git commands and allowed bash prefixes.
+- `.claude/` directory is specific to Claude Code — pi extension ignores these files.
+- Protected paths: `.chainlink/hook-config.json` and `.chainlink/rules/` (not `.claude/` for pi).
+- `chainlink issue quick` is the actual command (not `chainlink quick`).
+- JSON output available via `--json` flag on `list`, `show`, `search`, `session status`.
+- Locks require a git repository (worktree-based implementation).
+
+### 2.6 Configuration Validation
 
 On first load, if no `.chainlink/` directory found:
 
@@ -673,10 +697,10 @@ pi install git:github.com/<org>/pi-chainlink
 
 ### 8.3 Version Compatibility
 
-- Chainlink CLI >= 0.1.0 (current)
+- Chainlink CLI >= 0.2.0 (current)
 - pi >= current stable
 - Node.js >= 18 (for pi)
-- Python >= 3.6 (optional, for context-provider enrichment)
+- No Python dependency (context is built from CLI + rule files, not context-provider.py)
 
 ---
 
@@ -696,8 +720,16 @@ pi install git:github.com/<org>/pi-chainlink
 | 10 | 7 | M | Tests |
 | 11 | 8 | S | README + distribution setup |
 | 12 | — | S | End-to-end manual testing |
+| 0 | — | S | Verify chainlink CLI output formats (done) |
 
 **Total estimate:** ~2–3 days of focused work. The heavy lift is the work-check hook (step 6); everything else is straightforward.
+
+**Pre-work completed:**
+- [x] Verified `chainlink init` output structure (no `context-provider.py`, `.claude/` is Claude-specific)
+- [x] Verified JSON output formats (`--json` flag on list, show, search, session status)
+- [x] Verified command names (`chainlink issue quick` not `chainlink quick`)
+- [x] Verified `hook-config.json` defaults (strict mode, blocked git commands, allowed prefixes)
+- [x] Verified locks require git repo (not available in non-git directories)
 
 ---
 
@@ -776,7 +808,7 @@ class ChainlinkClient {
 
 ## Design Decisions
 
-1. **context-provider.py is the primary context source.** It's chainlink's own agent-agnostic bridge. We use it directly rather than reimplementing its logic. Direct rule loading is a fallback.
+1. **Context is built from chainlink CLI + rule files.** chainlink v0.2.0 does not ship `context-provider.py`. Context injection uses `--json` output from CLI commands (session status, ready, list) combined with direct rule file loading. If future releases add a context provider, it becomes an optional enrichment source.
 
 2. **No MCP, no subprocess hooks.** Pi's extension model is in-process TypeScript with event handlers. We don't try to port the Python hook scripts — we implement the same logic natively.
 
