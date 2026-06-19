@@ -20,7 +20,7 @@ const DEFAULT_CONFIG: ChainlinkConfig = {
     "git branch -d", "git branch -D", "git branch -m",
   ],
   allowed_bash_prefixes: [
-    "chainlink ",
+    "cd ", "chainlink ",
     "git status", "git diff", "git log", "git branch", "git show",
     "cargo test", "cargo build", "cargo check", "cargo clippy", "cargo fmt",
     "npm test", "npm run", "npx ",

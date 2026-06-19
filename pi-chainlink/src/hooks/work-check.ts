@@ -181,6 +181,7 @@ export async function runWorkCheck(
       return {
         block: true,
         reason:
+          `Git mutation blocked: "${input.command}"\n\n` +
           "Git mutation commands (push, commit, merge, rebase, reset, etc.) are " +
           "PERMANENTLY FORBIDDEN. The human performs all git write operations.\n\n" +
           "Read-only git commands (status, diff, log, show, branch) are allowed.",
@@ -203,8 +204,7 @@ export async function runWorkCheck(
   if (!status || !status.activeIssue) {
     const msg =
       config.tracking_mode === "strict"
-        ? "MANDATORY: You must have an active chainlink issue before writing, editing, " +
-          "or running bash commands.\n\n" +
+        ? `MANDATORY: No active chainlink issue. Blocked ${toolName} call.\n\n` +
           'Create one: chainlink issue quick "<describe the work>" -p <priority> -l <label>\n' +
           "Or pick existing: chainlink issue list -s open && chainlink session work <id>"
         : "Reminder: No active chainlink issue. Consider creating one before making changes.";
