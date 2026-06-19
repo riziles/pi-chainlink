@@ -44,9 +44,9 @@ jobs:
           merge-multiple: true
           path: artifacts
 
-      - name: Rename artifacts to friendly names
+      - name: Rename artifact to friendly name
         run: |
-          mv artifacts/chainlink-x86_64-pc-windows-msvc.exe  artifacts/chainlink-windows-x86_64.exe
+          mv artifacts/chainlink.exe artifacts/chainlink-windows-x86_64.exe
 
       - name: Generate SHA256 checksums
         run: |
