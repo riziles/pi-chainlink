@@ -1,5 +1,20 @@
 # Chainlink
 
+> **⚠️ Experimental — personal-use soft fork.**
+> This is a soft fork of Chainlink built for personal use. It is highly experimental
+> and may change or break at any time. Use at your own risk.
+>
+> **Motivation:** Chainlink is an awesome issue tracker, but the upstream project is
+> somewhat targeted to Claude Code — with Claude-specific hooks, MCP servers, and settings.
+> This fork aims to be more agent-agnostic, adding first-class support for pi (the pi coding
+> agent harness) via the `pi-chainlink` extension package in this repo, while remaining
+> compatible with Claude Code and other agents.
+>
+> **Windows binaries:** The Rust compile toolchain on Windows can be a pain. Compiled
+> Windows binaries (`chainlink.exe` for x86_64) are built and published automatically
+> via GitHub Actions on tagged releases. Grab the latest from
+> [Releases](https://github.com/riziles/pi-chainlink/releases).
+
 [![Crates.io](https://img.shields.io/crates/v/chainlink-tracker?style=flat-square)](https://crates.io/crates/chainlink-tracker)
 [![Downloads](https://img.shields.io/crates/d/chainlink-tracker?style=flat-square)](https://crates.io/crates/chainlink-tracker)
 [![License: MIT](https://img.shields.io/crates/l/chainlink-tracker?style=flat-square)](LICENSE)

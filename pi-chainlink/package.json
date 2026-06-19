@@ -1,0 +1,16 @@
+{
+  "name": "pi-chainlink",
+  "version": "0.1.0",
+  "description": "Chainlink issue tracking integration for the pi coding agent",
+  "license": "MIT",
+  "pi": {
+    "extensions": ["./src/extension.ts"],
+    "skills": ["./skills/"],
+    "prompts": ["./prompts/"]
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "vitest": "^3.0.0",
+    "@earendil-works/pi-coding-agent": "*"
+  }
+}

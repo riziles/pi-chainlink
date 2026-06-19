@@ -65,6 +65,9 @@ context-compression resilience.
 - `chainlink export` now outputs to stdout by default, use `-o` for file output
 
 ### Fixed
+- Agent struggles with strict mode catch-22: can't run chainlink commands to create issue when hook blocks everything (#5)
+- sessionWork test is flaky — chainlink quick() fails when session is ended mid-test-run (#4)
+- Fix allowed_bash_prefixes to include cd so chainlink commands work from any directory (#3)
 - Fix git command normalization bypass in work-check hook (#145)
 - Fix PRAGMA user_version column name bug causing repeated v7 migration (#144)
 - Fix hooks to always find parent .chainlink directory regardless of cwd (#123)
@@ -78,6 +81,7 @@ context-compression resilience.
 - Fix daemon log file corruption from duplicate file handles (#97)
 
 ### Changed
+- Add experimental disclaimer and motivation note to README (#14)
 - Resolve issue #26 where the prompt_guard.py depends on local variables, replace with dynamic approach the detects enabled languages from the available language markdown files in chainlink (#1)
 - Block git mutation commands via hook (#113)
 - Fix wrong assertion directions and tautological property tests (#96)
