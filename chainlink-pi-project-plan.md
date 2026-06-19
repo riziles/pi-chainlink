@@ -146,7 +146,9 @@ class ChainlinkClient {
 
 **Implementation notes:**
 - Uses `child_process.execFile` (not `exec`) — no shell injection
+- All operations are async (Promise-based) — never use `execSync`/`readFileSync` in event handlers (blocks pi's event loop)
 - 5-second default timeout, configurable
+- Internal request queue / mutex serializes CLI operations to prevent SQLite lock contention from parallel calls
 - Caches binary path after first discovery (check `hook-config.json`, then PATH, then `~/.cargo/bin`)
 - All methods handle the binary-not-found case gracefully (return null/empty, don't throw)
 - `quick()` parameters `priority` and `label` are optional (default to chainlink's defaults)
@@ -256,9 +258,13 @@ pi.on("before_agent_start", async (event, ctx) => {
 ```
 
 **Compaction handling:** Context is re-generated when older than 5 minutes (via `CONTEXT_STALENESS_MS`).
+Additionally, listen for `compaction_end` event to force immediate re-generation.
 This covers the case where pi compacts context and earlier injected messages are lost.
-The re-injection happens on the next `before_agent_start` after compaction, so the model
-sees fresh session state without spamming every turn.
+After compaction, the model sees fresh session state on the very next turn without waiting for the timer.
+
+**Lightweight updates:** To avoid token bloat on every turn, only re-inject the full context block
+when something changed (new comment, issue switch, compaction). Use incremental `<chainlink-session-update>`
+blocks for minor changes like timer ticks.
 
 **What the injected context looks like:**
 
@@ -437,6 +443,10 @@ function isBlockedGit(command: string, blockedList: string[]): boolean;
 function isAllowedBash(command: string, allowedList: string[]): boolean;
   // Splits on &&, ;, | — EVERY subcommand must be allowed
   // Prevents bypass via "allowed_cmd && malicious_cmd"
+  // NOTE: Simple string matching is prone to bypasses (eval, variable expansion, subshells).
+  // For strict enforcement, use a tokenizer/parser to extract all command invocations.
+  // Known limitations: eval, `bash -c`, command substitution, aliases.
+  // Mitigation: block `eval`, `bash -c`, `sh -c`, `source`/`.`, and `exec` in strict mode.
 ```
 
 ### 3.3 Differences from Chainlink's work-check.py
@@ -503,6 +513,8 @@ Scans for:
 Returns the list of detected stub types for the notification message.
 
 **Debouncing:** Only runs once per file per 60 seconds to avoid spamming on rapid edits.
+
+**Implementation note:** File reads must be async (`fs.promises.readFile`) to avoid blocking pi's event loop.
 
 ---
 
@@ -689,6 +701,79 @@ pi install git:github.com/<org>/pi-chainlink
 
 ---
 
+## Future Enhancement: Native pi Tools for Chainlink Commands
+
+**Current plan:** The extension relies on the agent executing `chainlink` CLI commands via the `bash` tool.
+This adds latency (subprocess spawn) and requires the agent to remember CLI syntax.
+
+**Future enhancement:** Register native pi tools for core Chainlink operations:
+
+```typescript
+// Example: native pi tools that wrap ChainlinkClient internally
+pi.registerTool({
+  name: "chainlink_status",
+  description: "Get current Chainlink session status",
+  parameters: Type.Object({}),
+  execute: async () => {
+    const status = await client.sessionStatus();
+    return { content: [{ type: "text", text: JSON.stringify(status) }], details: {} };
+  },
+});
+
+pi.registerTool({
+  name: "chainlink_comment",
+  description: "Add a comment to a Chainlink issue",
+  parameters: Type.Object({
+    issueId: Type.Number(),
+    text: Type.String(),
+  }),
+  execute: async (_id, params) => {
+    await client.comment(params.issueId, params.text);
+    return { content: [{ type: "text", text: `Comment added to #${params.issueId}` }], details: {} };
+  },
+});
+```
+
+**Benefits:**
+- Faster (in-process, no subprocess spawn)
+- Schema-validated parameters (issue IDs, priority, labels)
+- No CLI syntax errors
+- Cleaner agent prompts (fewer `bash` calls cluttering conversation)
+
+**When to implement:** Phase 9 — after the core extension is stable. The CLI-based approach works well
+for initial development and keeps the Phase 1-8 scope manageable.
+
+---
+
+## Concurrency & Event Loop Notes
+
+**Async-required context:** All event handlers in pi extensions run on the main event loop.
+Synchronous operations (`execSync`, `readFileSync`, blocking I/O) will freeze the TUI and
+block other event handlers.
+
+**Rules:**
+1. All file I/O uses `fs.promises` (async)
+2. All subprocess calls use `child_process.execFile` wrapped in promises
+3. Never call `execSync` or `readFileSync` inside `pi.on(...)` handlers
+
+**SQLite contention:** Chainlink uses SQLite (`.chainlink/issues.db`). If pi fires multiple
+parallel tool calls in one turn, `ChainlinkClient` must serialize operations through an
+internal mutex/queue to avoid `database is locked` errors.
+
+```typescript
+class ChainlinkClient {
+  private queue: Promise<void> = Promise.resolve();
+
+  private enqueue<T>(fn: () => Promise<T>): Promise<T> {
+    const result = this.queue.then(fn, fn); // skip rejections to keep queue alive
+    this.queue = result.catch(() => {});
+    return result;
+  }
+}
+```
+
+---
+
 ## Design Decisions
 
 1. **context-provider.py is the primary context source.** It's chainlink's own agent-agnostic bridge. We use it directly rather than reimplementing its logic. Direct rule loading is a fallback.
@@ -701,8 +786,10 @@ pi install git:github.com/<org>/pi-chainlink
 
 5. **Fail-open on errors.** If the chainlink binary isn't found or times out, the extension degrades gracefully (no enforcement, no context injection) rather than breaking pi.
 
-6. **Minimal dependencies.** No runtime dependencies required. `typebox` is listed in package.json only for future use if custom tools are added. For now, everything is Node.js built-ins + pi's extension API.
+6. **Minimal dependencies.** No runtime dependencies required. `typebox` is used for native tool parameter schemas (Future Enhancement section). Everything else is Node.js built-ins + pi's extension API.
 
 7. **Lock acquisition with session work.** When the extension calls `session work <id>`, it auto-acquires a lock on that issue via `chainlink lock <id>`. This prevents two pi instances from conflicting on the same issue.
 
 8. **Chainlink binary distribution.** The chainlink CLI Windows binary (`chainlink.exe`) is published via GitHub Actions on tagged releases and downloadable from [GitHub Releases](https://github.com/riziles/pi-chainlink/releases). The pi extension discovers it via PATH, hook-config.json, or `~/.cargo/bin`.
+
+9. **All async event handlers.** No synchronous I/O in any `pi.on(...)` handler. File reads use `fs.promises`, subprocess calls use async `execFile`. See Concurrency & Event Loop Notes above.
