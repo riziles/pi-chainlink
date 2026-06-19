@@ -189,7 +189,9 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     env:
-      CARGO_BUILD_JOBS: 2
+      CARGO_BUILD_JOBS: 1
+      CARGO_INCREMENTAL: 0
+      RUSTFLAGS: "-C debuginfo=0"
     defaults:
       run:
         working-directory: chainlink
