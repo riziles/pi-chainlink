@@ -122,7 +122,7 @@ class ChainlinkClient {
   hasActiveSession(): Promise<boolean>;
 
   // Issues
-  quick(title: string, priority: string, label: string): Promise<number>;
+  quick(title: string, opts?: { priority?: string; label?: string }): Promise<number>;
   list(opts?: ListOpts): Promise<Issue[]>;
   show(id: number): Promise<Issue | null>;
   close(id: number, opts?: CloseOpts): Promise<void>;
@@ -133,6 +133,7 @@ class ChainlinkClient {
   // Locks
   locksList(): Promise<string | null>;
   locksCheck(issueId: number): Promise<string | null>;
+  locksAcquire(issueId: number): Promise<boolean>;
   sync(): Promise<string | null>;
 
   // Agent
@@ -148,6 +149,7 @@ class ChainlinkClient {
 - 5-second default timeout, configurable
 - Caches binary path after first discovery (check `hook-config.json`, then PATH, then `~/.cargo/bin`)
 - All methods handle the binary-not-found case gracefully (return null/empty, don't throw)
+- `quick()` parameters `priority` and `label` are optional (default to chainlink's defaults)
 
 ### 1.4 Project Discovery (`src/discovery.ts`)
 
@@ -213,6 +215,10 @@ function getRuleContent(chainlinkDir: string): string;
 ### 2.2 Injection Points
 
 ```typescript
+let storedContext: string | null = null;
+let lastContextTime = 0;
+const CONTEXT_STALENESS_MS = 5 * 60 * 1000; // Re-fresh after 5 minutes
+
 // On session start — load and store context
 pi.on("session_start", async (event, ctx) => {
   const chainlinkDir = findChainlinkDir(ctx.cwd);
@@ -225,11 +231,20 @@ pi.on("session_start", async (event, ctx) => {
 
   // Generate context for injection
   storedContext = await buildContext(chainlinkDir, client);
+  lastContextTime = Date.now();
 });
 
-// Before each agent turn — inject stored context
+// Before each agent turn — inject stored context (with freshness check)
 pi.on("before_agent_start", async (event, ctx) => {
   if (!storedContext) return;
+
+  // Re-generate context if stale (handles compaction + long sessions)
+  const chainlinkDir = findChainlinkDir(ctx.cwd);
+  if (chainlinkDir && Date.now() - lastContextTime > CONTEXT_STALENESS_MS) {
+    const client = new ChainlinkClient(chainlinkDir);
+    storedContext = await buildContext(chainlinkDir, client);
+    lastContextTime = Date.now();
+  }
 
   return {
     injectMessages: [{
@@ -239,6 +254,11 @@ pi.on("before_agent_start", async (event, ctx) => {
   };
 });
 ```
+
+**Compaction handling:** Context is re-generated when older than 5 minutes (via `CONTEXT_STALENESS_MS`).
+This covers the case where pi compacts context and earlier injected messages are lost.
+The re-injection happens on the next `before_agent_start` after compaction, so the model
+sees fresh session state without spamming every turn.
 
 **What the injected context looks like:**
 
@@ -286,7 +306,12 @@ async function handleSessionLifecycle(client: ChainlinkClient): Promise<void>;
 - Check for stale session (>4 hours idle) → auto-end with note
 - If no active session → auto-start one
 - If resuming after context compression → auto-comment on active issue with `[auto]` breadcrumb
+- When `sessionWork` is called on an issue → auto-acquire lock via `chainlink lock <id>`
 - Always run `chainlink sync` (best-effort, non-blocking)
+
+**Lock acquisition on session work:** Prevents two pi instances from accidentally working
+on the same issue. Lock is acquired automatically on `sessionWork()` — the extension wraps
+the call with `client.locksAcquire(issueId)`.
 
 ### 2.4 Configuration Validation
 
@@ -389,6 +414,17 @@ pi.on("tool_call", async (event, ctx) => {
 ### 3.2 Helper Functions
 
 ```typescript
+// Maps tool names to their file path parameter names.
+// Pi's built-in tools use `file_path` for write, `path` for edit.
+// Extend this map if custom tools with file path params are added.
+const TOOL_FILE_PATH_PARAMS: Record<string, string[]> = {
+  write: ["file_path", "path"],
+  edit: ["file_path", "path"],
+};
+
+function getFilePathFromTool(toolName: string, input: Record<string, unknown>): string | null;
+  // Looks up TOOL_FILE_PATH_PARAMS and tries each candidate key
+
 function isProtectedPath(filePath: string, chainlinkDir: string): boolean;
   // Blocks: hook-config.json, .claude/hooks/*, .claude/settings.json
   // Uses path normalization for cross-platform matching
@@ -477,7 +513,9 @@ Returns the list of detected stub types for the notification message.
 ### 5.1 Event Handler (`src/hooks/prompt-guard.ts`)
 
 ```typescript
-// Track prompts since last chainlink usage
+// Track prompts since last chainlink usage.
+// Note: counter is in-memory only — resets on process restart.
+// This is acceptable since pi sessions typically don't survive restarts.
 let promptsSinceChainlink = 0;
 const REMINDER_THRESHOLD = 5;
 
@@ -638,7 +676,7 @@ pi install git:github.com/<org>/pi-chainlink
 | 2 | 1.3 | M | ChainlinkClient — the CLI wrapper |
 | 3 | 1.4–1.5 | S | Discovery + config reader |
 | 4 | 2.1 | M | Context provider integration |
-| 5 | 2.2–2.4 | M | Context injection + session lifecycle |
+| 5 | 2.2–2.4 | M | Context injection + session lifecycle (incl. lock acquisition) |
 | 6 | 3.1–3.2 | L | Work-check hook — the core enforcement |
 | 7 | 4 | S | Post-edit stub detection |
 | 8 | 5 | S | Prompt-guard drift detection |
@@ -663,4 +701,8 @@ pi install git:github.com/<org>/pi-chainlink
 
 5. **Fail-open on errors.** If the chainlink binary isn't found or times out, the extension degrades gracefully (no enforcement, no context injection) rather than breaking pi.
 
-6. **Minimal dependencies.** Only `typebox` for tool parameter schemas (if we add custom tools later). Everything else is Node.js built-ins + pi's extension API.
+6. **Minimal dependencies.** No runtime dependencies required. `typebox` is listed in package.json only for future use if custom tools are added. For now, everything is Node.js built-ins + pi's extension API.
+
+7. **Lock acquisition with session work.** When the extension calls `session work <id>`, it auto-acquires a lock on that issue via `chainlink lock <id>`. This prevents two pi instances from conflicting on the same issue.
+
+8. **Chainlink binary distribution.** The chainlink CLI Windows binary (`chainlink.exe`) is published via GitHub Actions on tagged releases and downloadable from [GitHub Releases](https://github.com/riziles/pi-chainlink/releases). The pi extension discovers it via PATH, hook-config.json, or `~/.cargo/bin`.
