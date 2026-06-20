@@ -38,6 +38,9 @@ let storedContext: string | null = null;
 let lastContextTime = 0;
 const CONTEXT_STALENESS_MS = 5 * 60 * 1000; // 5 minutes
 
+// Native chainlink tools — always allowed, reset prompt-guard counter
+const CHAINLINK_NATIVE_TOOLS = ["chainlink_session", "chainlink_issue", "chainlink_quick"];
+
 // ── Extension ───────────────────────────────────────────────────────────
 
 export default function (pi: ExtensionAPI) {
@@ -129,10 +132,16 @@ export default function (pi: ExtensionAPI) {
   // ── tool_call: work-check enforcement ─────────────────────────────
 
   pi.on("tool_call", async (event, ctx) => {
-    // Only intercept write, edit, bash
+    // Reset prompt guard when agent uses native chainlink tools
+    if (CHAINLINK_NATIVE_TOOLS.includes(event.toolName)) {
+      resetPromptCounter();
+      return; // Native tools skip work-check — always allowed
+    }
+
+    // Only intercept write, edit, bash for work-check enforcement
     if (!["write", "edit", "bash"].includes(event.toolName)) return;
 
-    // Reset prompt guard if agent called a chainlink command
+    // Reset prompt guard if agent called a chainlink command via bash
     if (event.toolName === "bash") {
       const command = (event.input as any)?.command;
       if (typeof command === "string" && command.startsWith("chainlink ")) {
