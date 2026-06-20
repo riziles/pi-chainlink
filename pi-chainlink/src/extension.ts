@@ -166,7 +166,7 @@ export default function (pi: ExtensionAPI) {
       if (!status || !status.active_issue) {
         ctx.ui.notify(
           "Reminder: No active chainlink issue. Consider creating one before making changes.",
-          "warn",
+          "warning",
         );
       }
     }
@@ -186,7 +186,7 @@ export default function (pi: ExtensionAPI) {
 
     const stubs = await checkFileForStubs(filePath);
     if (stubs.length > 0) {
-      ctx.ui.notify(buildStubMessage(filePath, stubs), "warn");
+      ctx.ui.notify(buildStubMessage(filePath, stubs), "warning");
     }
   });
 }

@@ -14,7 +14,7 @@ import { findChainlinkDir, findChainlinkBinary } from "./discovery.js";
 
 // Helpers
 
-let cachedChainlinkDir = null;
+let cachedChainlinkDir: string | null = null;
 function getClient(ctx: ExtensionContext): ChainlinkClient | null {
   const dir = cachedChainlinkDir ?? findChainlinkDir(ctx.cwd);
   if (!dir) return null;
@@ -77,7 +77,7 @@ export const ChainlinkQuickSchema = Type.Object({
 
 export type ChainlinkQuickInput = Static<typeof ChainlinkQuickSchema>;
 
-export function setChainlinkDir(dir) { cachedChainlinkDir = dir }
+export function setChainlinkDir(dir: string | null) { cachedChainlinkDir = dir }
 export function registerTools(pi: ExtensionAPI): void {
   pi.on("session_start", (_event, ctx) => {
     const dir = findChainlinkDir(ctx.cwd)
@@ -97,25 +97,25 @@ export function registerTools(pi: ExtensionAPI): void {
     parameters: ChainlinkSessionSchema,
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
       const client = getClient(ctx);
-      if (!client) return { content: [{ type: "text" as const, text: "No .chainlink/ directory found." }] };
+      if (!client) return { details: {}, content: [{ type: "text" as const, text: "No .chainlink/ directory found." }] };
       const { action, issue_id, notes } = params as ChainlinkSessionInput;
       switch (action) {
         case "status": {
           const s = await client.sessionStatus();
-          if (!s) return { content: [{ type: "text" as const, text: "No active session." }] };
+          if (!s) return { details: {}, content: [{ type: "text" as const, text: "No active session." }] };
           const active = s.active_issue ? `#${s.active_issue.id} \"${s.active_issue.title}\"` : "(none)";
-          return { content: [{ type: "text" as const, text: `Session #${s.session_id} (${s.duration_minutes}m)\nWorking on: ${active}` }] };
+          return { details: {}, content: [{ type: "text" as const, text: `Session #${s.session_id} (${s.duration_minutes}m)\nWorking on: ${active}` }] };
         }
         case "work": {
-          if (!issue_id) return { content: [{ type: "text" as const, text: "Missing issue_id" }], isError: true };
+          if (!issue_id) return { details: {}, content: [{ type: "text" as const, text: "Missing issue_id" }], isError: true };
           await client.sessionWork(issue_id);
-          return { content: [{ type: "text" as const, text: `Now working on issue #${issue_id}.` }] };
+          return { details: {}, content: [{ type: "text" as const, text: `Now working on issue #${issue_id}.` }] };
         }
         case "end": {
           await client.sessionEnd(notes);
-          return { content: [{ type: "text" as const, text: notes ? "Session ended with handoff notes." : "Session ended." }] };
+          return { details: {}, content: [{ type: "text" as const, text: notes ? "Session ended with handoff notes." : "Session ended." }] };
         }
-        default: return { content: [{ type: "text" as const, text: `Unknown action: ${action}` }], isError: true };
+        default: return { details: {}, content: [{ type: "text" as const, text: `Unknown action: ${action}` }], isError: true };
       }
     },
   });
@@ -135,42 +135,42 @@ export function registerTools(pi: ExtensionAPI): void {
     parameters: ChainlinkIssueSchema,
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
       const client = getClient(ctx);
-      if (!client) return { content: [{ type: "text" as const, text: "No .chainlink/ directory found." }] };
+      if (!client) return { details: {}, content: [{ type: "text" as const, text: "No .chainlink/ directory found." }] };
       const { action, id, text, status, priority, label } = params as ChainlinkIssueInput;
       switch (action) {
         case "list": {
           const issues = await client.list({ status: status ?? "open", priority, label });
-          if (issues.length === 0) return { content: [{ type: "text" as const, text: "No issues match." }] };
-          return { content: [{ type: "text" as const, text: issues.map(formatIssue).join("\n") }] };
+          if (issues.length === 0) return { details: {}, content: [{ type: "text" as const, text: "No issues match." }] };
+          return { details: {}, content: [{ type: "text" as const, text: issues.map(formatIssue).join("\n") }] };
         }
         case "show": {
-          if (!id) return { content: [{ type: "text" as const, text: "Missing id" }], isError: true };
+          if (!id) return { details: {}, content: [{ type: "text" as const, text: "Missing id" }], isError: true };
           const issue = await client.show(id);
-          if (!issue) return { content: [{ type: "text" as const, text: `Issue #${id} not found.` }], isError: true };
+          if (!issue) return { details: {}, content: [{ type: "text" as const, text: `Issue #${id} not found.` }], isError: true };
           const desc = issue.description ? `\n\n${issue.description}` : "";
-          return { content: [{ type: "text" as const, text: `#${issue.id}: ${issue.title}\nStatus: ${issue.status}\nPriority: ${issue.priority}\nCreated: ${issue.created_at}${desc}` }] };
+          return { details: {}, content: [{ type: "text" as const, text: `#${issue.id}: ${issue.title}\nStatus: ${issue.status}\nPriority: ${issue.priority}\nCreated: ${issue.created_at}${desc}` }] };
         }
         case "comment": {
-          if (!id || !text) return { content: [{ type: "text" as const, text: "Missing id and text" }], isError: true };
+          if (!id || !text) return { details: {}, content: [{ type: "text" as const, text: "Missing id and text" }], isError: true };
           await client.comment(id, text);
-          return { content: [{ type: "text" as const, text: `Added comment to issue #${id}.` }] };
+          return { details: {}, content: [{ type: "text" as const, text: `Added comment to issue #${id}.` }] };
         }
         case "close": {
-          if (!id) return { content: [{ type: "text" as const, text: "Missing id" }], isError: true };
+          if (!id) return { details: {}, content: [{ type: "text" as const, text: "Missing id" }], isError: true };
           await client.close(id, { comment: text });
-          return { content: [{ type: "text" as const, text: text ? `Closed issue #${id} with comment.` : `Closed issue #${id}.` }] };
+          return { details: {}, content: [{ type: "text" as const, text: text ? `Closed issue #${id} with comment.` : `Closed issue #${id}.` }] };
         }
         case "ready": {
           const issues = await client.ready();
-          if (issues.length === 0) return { content: [{ type: "text" as const, text: "No ready (unblocked) issues." }] };
-          return { content: [{ type: "text" as const, text: "Ready issues:\n" + issues.map(formatIssue).join("\n") }] };
+          if (issues.length === 0) return { details: {}, content: [{ type: "text" as const, text: "No ready (unblocked) issues." }] };
+          return { details: {}, content: [{ type: "text" as const, text: "Ready issues:\n" + issues.map(formatIssue).join("\n") }] };
         }
         case "next": {
           const issue = await client.next();
-          if (!issue) return { content: [{ type: "text" as const, text: "No issues available." }] };
-          return { content: [{ type: "text" as const, text: `Next issue: ${formatIssue(issue)}` }] };
+          if (!issue) return { details: {}, content: [{ type: "text" as const, text: "No issues available." }] };
+          return { details: {}, content: [{ type: "text" as const, text: `Next issue: ${formatIssue(issue)}` }] };
         }
-        default: return { content: [{ type: "text" as const, text: `Unknown action: ${action}` }], isError: true };
+        default: return { details: {}, content: [{ type: "text" as const, text: `Unknown action: ${action}` }], isError: true };
       }
     },
   });
@@ -188,15 +188,15 @@ export function registerTools(pi: ExtensionAPI): void {
     parameters: ChainlinkQuickSchema,
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
       const client = getClient(ctx);
-      if (!client) return { content: [{ type: "text" as const, text: "No .chainlink/ directory found." }] };
+      if (!client) return { details: {}, content: [{ type: "text" as const, text: "No .chainlink/ directory found." }] };
       const { title, priority, label } = params as ChainlinkQuickInput;
       const id = await client.quick(title, { priority, label });
-      if (!id) return { content: [{ type: "text" as const, text: "Failed to create issue." }], isError: true };
+      if (!id) return { details: {}, content: [{ type: "text" as const, text: "Failed to create issue." }], isError: true };
       const parts = [`Created issue #${id}: \"${title}\"`];
       if (priority) parts.push(`Priority: ${priority}`);
       if (label) parts.push(`Label: ${label}`);
       parts.push("Now working on this issue.");
-      return { content: [{ type: "text" as const, text: parts.join("\n") }] };
+      return { details: {}, content: [{ type: "text" as const, text: parts.join("\n") }] };
     },
   });
 }

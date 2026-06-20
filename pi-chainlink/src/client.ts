@@ -47,7 +47,7 @@ export interface CloseOpts {
 export class ChainlinkClient {
   private chainlinkDir: string;
   private binaryPath: string;
-  private queue: Promise<void> = Promise.resolve();
+  private queue: Promise<unknown> = Promise.resolve();
 
   /**
    * @param chainlinkDir - Path to the directory containing .chainlink/
