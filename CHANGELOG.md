@@ -37,6 +37,7 @@ context-compression resilience.
 - Database schema v7→v8 migration (adds `last_action` column to sessions, auto-applied on first use)
 
 ### Added
+- Add path filters to CI workflow to skip Rust tests on pi-chainlink-only PRs (#29)
 - Add MAPPING.md with upstream source map and maintainer checklist (#28)
 - Add context-provider.py to chainlink for agent-agnostic context injection (#8)
 - Add context-provider.py to chainlink CLI resources and deploy with init (#26)
