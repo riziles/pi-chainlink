@@ -20,6 +20,10 @@ const MCP_JSON: &str = include_str!("../../resources/mcp.json");
 // Embed hook configuration
 const HOOK_CONFIG_JSON: &str = include_str!("../../resources/chainlink/hook-config.json");
 
+// Embed context provider for agent-agnostic context injection
+const CONTEXT_PROVIDER_PY: &str =
+    include_str!("../../resources/chainlink/integrations/context-provider.py");
+
 // Auto-generated rule file includes from build.rs
 // Includes all RULE_* constants and RULE_FILES array
 // Adding a new rule = just drop a .md/.txt file in resources/chainlink/rules/
@@ -140,6 +144,15 @@ pub fn run(path: &Path, force: bool) -> Result<()> {
     if !rules_local_dir.exists() {
         fs::create_dir_all(&rules_local_dir)
             .context("Failed to create .chainlink/rules.local directory")?;
+    }
+
+    // Deploy context-provider.py for agent-agnostic context injection
+    let integrations_dir = chainlink_dir.join("integrations");
+    if !integrations_dir.exists() || force {
+        fs::create_dir_all(&integrations_dir)
+            .context("Failed to create .chainlink/integrations directory")?;
+        fs::write(integrations_dir.join("context-provider.py"), CONTEXT_PROVIDER_PY)
+            .context("Failed to write context-provider.py")?;
     }
 
     // Write .chainlink/.gitignore for machine-local files
@@ -614,12 +627,64 @@ mod tests {
         assert!(!SAFE_FETCH_SERVER_PY.is_empty());
         assert!(!MCP_JSON.is_empty());
         assert!(!RULE_SANITIZE_PATTERNS.is_empty());
+        assert!(!CONTEXT_PROVIDER_PY.is_empty());
+        assert!(CONTEXT_PROVIDER_PY.contains("def get_coding_rules"));
+        assert!(CONTEXT_PROVIDER_PY.contains("def find_chainlink_dir"));
         assert!(!HOOK_CONFIG_JSON.is_empty());
         assert!(!RULE_TRACKING_STRICT.is_empty());
         assert!(!RULE_TRACKING_NORMAL.is_empty());
         assert!(!RULE_TRACKING_RELAXED.is_empty());
         assert!(!RULE_GLOBAL.is_empty());
         assert!(!RULE_RUST.is_empty());
+    }
+
+    #[test]
+    fn test_init_deploys_context_provider() {
+        let dir = tempdir().unwrap();
+        run(dir.path(), false).unwrap();
+
+        let provider_path = dir
+            .path()
+            .join(".chainlink/integrations/context-provider.py");
+        assert!(provider_path.exists(), "context-provider.py should be deployed");
+
+        let content = fs::read_to_string(&provider_path).unwrap();
+        assert!(content.contains("def get_coding_rules"));
+        assert!(content.contains("def detect_languages"));
+        assert!(content.contains("#!/usr/bin/env python3"));
+    }
+
+    #[test]
+    fn test_init_deploys_context_provider_on_existing() {
+        let dir = tempdir().unwrap();
+        run(dir.path(), false).unwrap();
+
+        // Second init without force should not overwrite
+        let provider_path = dir
+            .path()
+            .join(".chainlink/integrations/context-provider.py");
+        let original = fs::read_to_string(&provider_path).unwrap();
+
+        run(dir.path(), false).unwrap();
+        let after = fs::read_to_string(&provider_path).unwrap();
+        assert_eq!(original, after, "context-provider.py should not be overwritten without force");
+    }
+
+    #[test]
+    fn test_init_force_updates_context_provider() {
+        let dir = tempdir().unwrap();
+        run(dir.path(), false).unwrap();
+
+        let provider_path = dir
+            .path()
+            .join(".chainlink/integrations/context-provider.py");
+        fs::write(&provider_path, "# modified stub").unwrap();
+
+        run(dir.path(), true).unwrap();
+
+        let content = fs::read_to_string(&provider_path).unwrap();
+        assert_ne!(content, "# modified stub", "force should restore original content");
+        assert!(content.contains("def get_coding_rules"));
     }
 
     #[test]

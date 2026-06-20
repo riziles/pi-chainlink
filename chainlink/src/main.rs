@@ -131,6 +131,17 @@ enum Commands {
         action: LocksCommands,
     },
 
+    /// Generate AI context from chainlink project state (session, issues, rules)
+    Context {
+        /// Output format (xml, md, json)
+        #[arg(short, long, default_value = "xml")]
+        format: String,
+
+        /// Additional args to pass to context-provider.py
+        #[arg(last = true)]
+        extra_args: Vec<String>,
+    },
+
     /// Fetch locks and report coordination status
     Sync,
 
@@ -1596,6 +1607,16 @@ fn run() -> Result<()> {
                 LocksCommands::Release { id } => commands::locks_cmd::release(&chainlink_dir, id),
                 LocksCommands::Steal { id } => commands::locks_cmd::steal(&chainlink_dir, id),
             }
+        }
+
+        Commands::Context {
+            format,
+            extra_args,
+        } => {
+            let chainlink_dir = find_chainlink_dir()?;
+            let mut args = vec!["--format".to_string(), format];
+            args.extend(extra_args);
+            commands::context::run(&chainlink_dir, &args)
         }
 
         Commands::Sync => {

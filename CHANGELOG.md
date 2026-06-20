@@ -37,6 +37,8 @@ context-compression resilience.
 - Database schema v7→v8 migration (adds `last_action` column to sessions, auto-applied on first use)
 
 ### Added
+- Add context-provider.py to chainlink for agent-agnostic context injection (#8)
+- Add context-provider.py to chainlink CLI resources and deploy with init (#26)
 - Update hook scripts for multi-agent lock awareness (#172)
 - Improve hook error messages to prevent Claude workarounds (#129)
 - Reorganize CLI into hierarchical subcommands with backward-compat aliases (#160)

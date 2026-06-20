@@ -37,6 +37,7 @@
     "ls",
     "dir",
     "pwd",
-    "echo"
+    "echo",
+    "gh"
   ]
 }

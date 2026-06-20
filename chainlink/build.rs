@@ -41,6 +41,7 @@ fn main() {
 
     // Track chainlink config
     println!("cargo:rerun-if-changed=resources/chainlink/hook-config.json");
+    println!("cargo:rerun-if-changed=resources/chainlink/integrations/context-provider.py");
 
     // Auto-discover and track all rule files in resources/chainlink/rules/
     println!("cargo:rerun-if-changed=resources/chainlink/rules/");
