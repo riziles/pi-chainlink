@@ -11,10 +11,30 @@ env:
 
 jobs:
   # ===========================================
+  # Detect changed paths — skip heavy Rust jobs on pi-chainlink-only PRs
+  # ===========================================
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      rust: ${{ steps.filter.outputs.rust }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            rust:
+              - 'chainlink/**'
+              - '.github/workflows/ci.yml'
+
+  # ===========================================
   # Linting - runs on Ubuntu for speed
   # ===========================================
   lint:
     name: Lint
+    needs: changes
+    if: needs.changes.outputs.rust == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -49,6 +69,8 @@ jobs:
   # ===========================================
   security:
     name: Security Audit
+    needs: changes
+    if: needs.changes.outputs.rust == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -70,6 +92,8 @@ jobs:
   # ===========================================
   test:
     name: Test (${{ matrix.os }})
+    needs: changes
+    if: needs.changes.outputs.rust == 'true'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     defaults:
@@ -113,6 +137,8 @@ jobs:
   # ===========================================
   proptest:
     name: Property Tests
+    needs: changes
+    if: needs.changes.outputs.rust == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -144,6 +170,8 @@ jobs:
   # ===========================================
   fuzz:
     name: Fuzz Tests
+    needs: changes
+    if: needs.changes.outputs.rust == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -186,6 +214,8 @@ jobs:
   # ===========================================
   build-release:
     name: Build Release (${{ matrix.os }})
+    needs: changes
+    if: needs.changes.outputs.rust == 'true'
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     env:
