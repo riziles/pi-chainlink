@@ -65,6 +65,7 @@ context-compression resilience.
 - `chainlink export` now outputs to stdout by default, use `-o` for file output
 
 ### Fixed
+- Fix activeIssue camelCase bug in work-check that permanently blocks all tools (#19)
 - Agent struggles with strict mode catch-22: can't run chainlink commands to create issue when hook blocks everything (#5)
 - sessionWork test is flaky — chainlink quick() fails when session is ended mid-test-run (#4)
 - Fix allowed_bash_prefixes to include cd so chainlink commands work from any directory (#3)
