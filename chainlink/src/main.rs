@@ -1609,10 +1609,7 @@ fn run() -> Result<()> {
             }
         }
 
-        Commands::Context {
-            format,
-            extra_args,
-        } => {
+        Commands::Context { format, extra_args } => {
             let chainlink_dir = find_chainlink_dir()?;
             let mut args = vec!["--format".to_string(), format];
             args.extend(extra_args);

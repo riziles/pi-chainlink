@@ -151,8 +151,11 @@ pub fn run(path: &Path, force: bool) -> Result<()> {
     if !integrations_dir.exists() || force {
         fs::create_dir_all(&integrations_dir)
             .context("Failed to create .chainlink/integrations directory")?;
-        fs::write(integrations_dir.join("context-provider.py"), CONTEXT_PROVIDER_PY)
-            .context("Failed to write context-provider.py")?;
+        fs::write(
+            integrations_dir.join("context-provider.py"),
+            CONTEXT_PROVIDER_PY,
+        )
+        .context("Failed to write context-provider.py")?;
     }
 
     // Write .chainlink/.gitignore for machine-local files
@@ -646,7 +649,10 @@ mod tests {
         let provider_path = dir
             .path()
             .join(".chainlink/integrations/context-provider.py");
-        assert!(provider_path.exists(), "context-provider.py should be deployed");
+        assert!(
+            provider_path.exists(),
+            "context-provider.py should be deployed"
+        );
 
         let content = fs::read_to_string(&provider_path).unwrap();
         assert!(content.contains("def get_coding_rules"));
@@ -667,7 +673,10 @@ mod tests {
 
         run(dir.path(), false).unwrap();
         let after = fs::read_to_string(&provider_path).unwrap();
-        assert_eq!(original, after, "context-provider.py should not be overwritten without force");
+        assert_eq!(
+            original, after,
+            "context-provider.py should not be overwritten without force"
+        );
     }
 
     #[test]
@@ -683,7 +692,10 @@ mod tests {
         run(dir.path(), true).unwrap();
 
         let content = fs::read_to_string(&provider_path).unwrap();
-        assert_ne!(content, "# modified stub", "force should restore original content");
+        assert_ne!(
+            content, "# modified stub",
+            "force should restore original content"
+        );
         assert!(content.contains("def get_coding_rules"));
     }
 
