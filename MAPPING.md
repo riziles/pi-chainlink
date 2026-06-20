@@ -1,13 +1,25 @@
 # Upstream Source Map
 
-This documents the relationship between our pi-chainlink fork and the upstream
-chainlink repo, so a maintainer can update both sides in sync.
+This documents the relationship between our fork (`riziles/pi-chainlink`)
+and the upstream chainlink repo (`dollspace-gay/chainlink`), so a maintainer
+can update both sides in sync.
+
+```bash
+# Our fork
+git remote add origin https://github.com/riziles/pi-chainlink
+# True upstream (where the Rust CLI + Python hooks come from)
+git remote add upstream https://github.com/dollspace-gay/chainlink
+```
 
 ## Repo Layout
 
+Our fork adds `pi-chainlink/` (TypeScript extension) on top of upstream.
+Everything outside `pi-chainlink/` is upstream code, with a few additive
+changes (see [Rust CLI changes](#chainlink-rust-cli-changes)).
+
 ```
-pi-chainlink/                          ← upstream repo root (forked)
-├── chainlink/                         ← UPSTREAM: Rust CLI (vendored / forked)
+pi-chainlink/                          ← OUR FORK root
+├── chainlink/                         ← UPSTREAM: Rust CLI
 │   ├── src/                           ← we've added ~3 files here
 │   ├── resources/claude/hooks/*.py   ← UPSTREAM: Claude Code hooks (VERBATIM)
 │   ├── resources/chainlink/           ← UPSTREAM: rules + config (mostly verbatim)
@@ -86,11 +98,12 @@ All our Rust changes are additive — no upstream files were modified in breakin
 
 ### On upstream release
 
-1. **Fetch upstream tags**: `git fetch upstream --tags`
-2. **Diff untouched files**: `git diff upstream/main -- chainlink/src/ chainlink/build.rs chainlink/Cargo.toml -- ":(exclude)chainlink/src/commands/context.rs" ":(exclude)chainlink/src/commands/init.rs" ":(exclude)chainlink/src/commands/mod.rs" ":(exclude)chainlink/src/main.rs"`
-   - Any diff means we accidentally modified upstream code — review and revert if unintended
-3. **Diff Python hooks**: `diff -r chainlink/resources/claude/hooks/ <upstream>/resources/claude/hooks/`
-   - These should be VERBATIM. If upstream changed, review each change against our ported TypeScript counterparts (see Hook Source Map above)
+1. **Fetch upstream tags**: `git fetch upstream`
+2. **Check version drift**: `git diff upstream/main -- chainlink/Cargo.toml | grep version` — if upstream bumped the version, we need to merge
+3. **Diff untouched files**: `git diff upstream/main -- chainlink/ -- ":(exclude)chainlink/src/commands/context.rs" ":(exclude)chainlink/src/commands/init.rs" ":(exclude)chainlink/src/commands/mod.rs" ":(exclude)chainlink/src/main.rs" ":(exclude)chainlink/resources/chainlink/integrations/"`
+   - Any diff in non-excluded files means we accidentally modified upstream code — review and revert if unintended
+4. **Diff Python hooks**: `git diff upstream/main -- chainlink/resources/claude/hooks/`
+   - These should be VERBATIM (no diff). If upstream changed, review each change against our ported TypeScript counterparts (see Hook Source Map below)
 4. **Port hook changes**: For each upstream hook that changed:
    - Check the corresponding TypeScript file in the Hook Source Map
    - If it's a `✅ Ported` hook, apply the same behavioral change to the TS version
