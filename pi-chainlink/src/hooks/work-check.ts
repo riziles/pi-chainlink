@@ -44,17 +44,27 @@ export function getFilePathFromTool(
  * Check if a file path targets chainlink hook infrastructure.
  * Protected: .chainlink/hook-config.json, .chainlink/rules/
  */
-export function isProtectedPath(filePath: string, chainlinkDir: string): boolean {
+export function isProtectedPath(
+  filePath: string,
+  chainlinkDir: string,
+): boolean {
   const normalized = normalize(filePath);
   const chainlinkConfigDir = normalize(`${chainlinkDir}${sep}.chainlink`);
 
   // .chainlink/hook-config.json
-  if (normalized === normalize(`${chainlinkDir}${sep}.chainlink${sep}hook-config.json`)) {
+  if (
+    normalized ===
+    normalize(`${chainlinkDir}${sep}.chainlink${sep}hook-config.json`)
+  ) {
     return true;
   }
 
   // .chainlink/rules/ directory
-  if (normalized.startsWith(normalize(`${chainlinkDir}${sep}.chainlink${sep}rules${sep}`))) {
+  if (
+    normalized.startsWith(
+      normalize(`${chainlinkDir}${sep}.chainlink${sep}rules${sep}`),
+    )
+  ) {
     return true;
   }
 
@@ -104,7 +114,14 @@ export function isBlockedGit(command: string, blockedList: string[]): boolean {
  * Commands blocked in strict mode to prevent shell bypasses.
  * Prevents: eval, bash -c, sh -c, source, ., exec
  */
-const BLOCKED_SHELL_BUILTINS = ["eval ", "bash -c ", "sh -c ", "source ", ". ", "exec "];
+const BLOCKED_SHELL_BUILTINS = [
+  "eval ",
+  "bash -c ",
+  "sh -c ",
+  "source ",
+  ". ",
+  "exec ",
+];
 
 /**
  * Check if a bash command is in the allowed list.
@@ -134,7 +151,9 @@ export function isAllowedBash(
     const normalized = sub.trim();
     if (normalized.length === 0) continue;
 
-    const isAllowed = allowedList.some((prefix) => normalized.startsWith(prefix));
+    const isAllowed = allowedList.some((prefix) =>
+      normalized.startsWith(prefix),
+    );
     if (!isAllowed) return false;
   }
 
@@ -191,7 +210,13 @@ export async function runWorkCheck(
 
   // Guard 3: Allow-listed bash (always pass)
   if (toolName === "bash" && typeof input.command === "string") {
-    if (isAllowedBash(input.command, config.allowed_bash_prefixes, config.tracking_mode)) {
+    if (
+      isAllowedBash(
+        input.command,
+        config.allowed_bash_prefixes,
+        config.tracking_mode,
+      )
+    ) {
       return { block: false };
     }
   }
@@ -201,7 +226,7 @@ export async function runWorkCheck(
 
   // Guard 5: Check for active issue
   const status = await client.sessionStatus();
-  if (!status || !status.activeIssue) {
+  if (!status || !status.active_issue) {
     const msg =
       config.tracking_mode === "strict"
         ? `MANDATORY: No active chainlink issue. Blocked ${toolName} call.\n\n` +
@@ -216,11 +241,15 @@ export async function runWorkCheck(
   }
 
   // Guard 6: Lock conflict check
-  if (status.activeIssue) {
-    const lockResult = await client.locksCheck(status.activeIssue.id);
-    if (lockResult && lockResult.includes("locked by") && !lockResult.includes(ourAgentId)) {
+  if (status.active_issue) {
+    const lockResult = await client.locksCheck(status.active_issue.id);
+    if (
+      lockResult &&
+      lockResult.includes("locked by") &&
+      !lockResult.includes(ourAgentId)
+    ) {
       const msg =
-        `Lock conflict: Issue #${status.activeIssue.id} is ${lockResult}. ` +
+        `Lock conflict: Issue #${status.active_issue.id} is ${lockResult}. ` +
         "Another agent has claimed this issue.";
       if (config.tracking_mode === "strict") {
         return { block: true, reason: msg };

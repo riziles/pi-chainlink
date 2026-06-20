@@ -73,5 +73,5 @@ export function findChainlinkBinary(chainlinkDir: string | null): string {
   }
 
   // Check if "chainlink" is on PATH (will resolve on Windows as chainlink.exe)
-  return "chainlink";
+  return "C:/Users/seana/bin/chainlink.exe";
 }

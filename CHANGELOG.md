@@ -37,6 +37,8 @@ context-compression resilience.
 - Database schema v7→v8 migration (adds `last_action` column to sessions, auto-applied on first use)
 
 ### Added
+- Add context-provider.py to chainlink for agent-agnostic context injection (#8)
+- Add context-provider.py to chainlink CLI resources and deploy with init (#26)
 - Update hook scripts for multi-agent lock awareness (#172)
 - Improve hook error messages to prevent Claude workarounds (#129)
 - Reorganize CLI into hierarchical subcommands with backward-compat aliases (#160)
@@ -65,6 +67,7 @@ context-compression resilience.
 - `chainlink export` now outputs to stdout by default, use `-o` for file output
 
 ### Fixed
+- Fix activeIssue camelCase bug in work-check that permanently blocks all tools (#19)
 - Agent struggles with strict mode catch-22: can't run chainlink commands to create issue when hook blocks everything (#5)
 - sessionWork test is flaky — chainlink quick() fails when session is ended mid-test-run (#4)
 - Fix allowed_bash_prefixes to include cd so chainlink commands work from any directory (#3)

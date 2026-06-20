@@ -19,6 +19,7 @@ import { handleSessionLifecycle } from "./hooks/session.js";
 import { runWorkCheck } from "./hooks/work-check.js";
 import { checkFileForStubs, buildStubMessage } from "./hooks/post-edit.js";
 import { resetPromptCounter, checkPromptGuard } from "./hooks/prompt-guard.js";
+import { registerTools } from "./tools.js";
 
 // ── Agent identity ──────────────────────────────────────────────────────
 
@@ -41,6 +42,7 @@ const CONTEXT_STALENESS_MS = 5 * 60 * 1000; // 5 minutes
 
 export default function (pi: ExtensionAPI) {
   const agentId = getAgentId();
+  registerTools(pi);
 
   // ── session_start: load chainlink config and inject context ────────
 
@@ -161,10 +163,10 @@ export default function (pi: ExtensionAPI) {
     // Normal mode warnings (issue-less work)
     if (config.tracking_mode === "normal") {
       const status = await client.sessionStatus();
-      if (!status || !status.activeIssue) {
+      if (!status || !status.active_issue) {
         ctx.ui.notify(
           "Reminder: No active chainlink issue. Consider creating one before making changes.",
-          "warn",
+          "warning",
         );
       }
     }
@@ -184,7 +186,7 @@ export default function (pi: ExtensionAPI) {
 
     const stubs = await checkFileForStubs(filePath);
     if (stubs.length > 0) {
-      ctx.ui.notify(buildStubMessage(filePath, stubs), "warn");
+      ctx.ui.notify(buildStubMessage(filePath, stubs), "warning");
     }
   });
 }
