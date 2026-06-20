@@ -24,4 +24,5 @@ chainlink/.chainlink/.cache/last-edit-time
 .chainlink/.cache/guard-full-sent
 OPUS_4_6_SUGGESTIONS.md
 chainlink-pi-project-plan.md
+node_modules/
 nul
